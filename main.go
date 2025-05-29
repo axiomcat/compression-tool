@@ -39,27 +39,42 @@ func main() {
 	if err != nil {
 		log.Fatalln("Error reading file", err)
 	}
+	fmt.Println("Building char frequency")
 	charFrequency := BuildCharFrequency(string(bytes))
 	nodes := []Node{}
 	for k, v := range charFrequency {
 		newNode := Node{Weight: v, Char: k, LeftNode: nil, RightNode: nil}
 		nodes = append(nodes, newNode)
 	}
-
+	fmt.Println("Finished char frequency")
+	fmt.Println("Building tree")
 	tree := BuildHuffmanTree(nodes)
+	fmt.Println("Finished tree")
+	fmt.Println("Building CodeTable")
 	prefixCodeTable := BuildPrefixCodeTable(tree)
+	fmt.Println("Finished CodeTable")
+
+	fmt.Println("Start encoding")
 	compressedFile := []byte{}
 	for k, v := range prefixCodeTable {
 		headerTableEntry := fmt.Sprintf("%x:%s,", k, v)
 		compressedFile = append(compressedFile, headerTableEntry...)
 	}
 
+	fmt.Println("\tFinished header encoding")
+
 	compressedFile = append(compressedFile, 'µ')
 
 	encodedFile := ""
-	for _, c := range string(bytes) {
+	inputLen := len(bytes)
+	fmt.Printf("Input len %d\n", inputLen)
+	for i, c := range string(bytes) {
+		if i%100000 == 0 {
+			fmt.Printf("%d/%d\n", i, inputLen)
+		}
 		encodedFile += prefixCodeTable[c]
 	}
+	fmt.Println("\tFinished building full string")
 	l := len(encodedFile)
 	for i := 0; i < l; i += 7 {
 		end := min(l, i+7)

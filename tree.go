@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/heap"
 	"fmt"
 	"slices"
 )
@@ -38,6 +39,35 @@ func printTree(node *Node) {
 
 func BuildHuffmanTree(nodes []Node) Node {
 	slices.SortFunc(nodes, compareNodes)
+	usePQ := true
+	if usePQ {
+		pq := make(PriorityQueue, len(nodes))
+		i := 0
+
+		for _, n := range nodes {
+			pq[i] = &Item{
+				value:    n,
+				priority: n.Weight,
+				index:    -i,
+			}
+			i++
+		}
+		heap.Init(&pq)
+		for pq.Len() > 1 {
+			tempL := heap.Pop(&pq).(*Item)
+			tempR := heap.Pop(&pq).(*Item)
+			newRoot := Node{Weight: tempL.value.Weight + tempR.value.Weight, LeftNode: &tempL.value, RightNode: &tempR.value}
+			newItem := &Item{
+				value:    newRoot,
+				priority: 1,
+			}
+			heap.Push(&pq, newItem)
+			pq.Update(newItem, newItem.value, -newItem.value.Weight)
+		}
+		treeRoot := heap.Pop(&pq).(*Item)
+		return treeRoot.value
+	}
+
 	for len(nodes) > 1 {
 		tempL := nodes[0]
 		tempR := nodes[1]
@@ -52,6 +82,9 @@ func BuildHuffmanTree(nodes []Node) Node {
 func BuildPrefixCodeTable(tree Node) map[rune]string {
 	prefixCodeTable := make(map[rune]string)
 	buildPrefixCodeTableAux(&tree, prefixCodeTable, "")
+	// for k, v := range prefixCodeTable {
+	// 	fmt.Printf("%s:%s\n", string(k), v)
+	// }
 	return prefixCodeTable
 }
 
