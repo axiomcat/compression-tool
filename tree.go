@@ -49,19 +49,18 @@ func BuildHuffmanTree(nodes []Node) Node {
 	return nodes[0]
 }
 
-func BuildPrefixCodeTable(tree Node) map[rune]int8 {
-	prefixCodeTable := make(map[rune]int8)
-	buildPrefixCodeTableAux(&tree, prefixCodeTable, 0)
-	fmt.Println(prefixCodeTable)
+func BuildPrefixCodeTable(tree Node) map[rune]string {
+	prefixCodeTable := make(map[rune]string)
+	buildPrefixCodeTableAux(&tree, prefixCodeTable, "")
 	return prefixCodeTable
 }
 
-func buildPrefixCodeTableAux(tree *Node, table map[rune]int8, currPrefix int8) {
+func buildPrefixCodeTableAux(tree *Node, table map[rune]string, currPrefix string) {
 	// Is a leaf
 	if tree.Char != 0 {
 		table[tree.Char] = currPrefix
 		return
 	}
-	buildPrefixCodeTableAux(tree.LeftNode, table, currPrefix*2)
-	buildPrefixCodeTableAux(tree.RightNode, table, currPrefix*2+1)
+	buildPrefixCodeTableAux(tree.LeftNode, table, currPrefix+"0")
+	buildPrefixCodeTableAux(tree.RightNode, table, currPrefix+"1")
 }
