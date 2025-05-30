@@ -47,8 +47,8 @@ func BuildHuffmanTree(nodes []Node) Node {
 		for _, n := range nodes {
 			pq[i] = &Item{
 				value:    n,
-				priority: n.Weight,
-				index:    -i,
+				priority: -n.Weight,
+				index:    i,
 			}
 			i++
 		}
@@ -82,9 +82,6 @@ func BuildHuffmanTree(nodes []Node) Node {
 func BuildPrefixCodeTable(tree Node) map[rune]string {
 	prefixCodeTable := make(map[rune]string)
 	buildPrefixCodeTableAux(&tree, prefixCodeTable, "")
-	// for k, v := range prefixCodeTable {
-	// 	fmt.Printf("%s:%s\n", string(k), v)
-	// }
 	return prefixCodeTable
 }
 
@@ -96,4 +93,35 @@ func buildPrefixCodeTableAux(tree *Node, table map[rune]string, currPrefix strin
 	}
 	buildPrefixCodeTableAux(tree.LeftNode, table, currPrefix+"0")
 	buildPrefixCodeTableAux(tree.RightNode, table, currPrefix+"1")
+}
+
+func BuildHeaderTree(tree *Node, path string) string {
+	if tree.Char != 0 {
+		return "1" + string(tree.Char)
+	}
+	if tree == nil {
+		return ""
+	}
+	l := BuildHeaderTree(tree.LeftNode, path)
+	r := BuildHeaderTree(tree.RightNode, path)
+	return "0" + l + r
+}
+
+func BuildTreeFromHeader(header string, currentPrefix string, prefixCodeTable map[string]rune) string {
+	// Header 01E001U1D01L01C001Z1K1M
+	headerValue := header[0]
+	if headerValue == '0' {
+		// Remove 0 from the header
+		header = header[1:]
+		header = BuildTreeFromHeader(header, currentPrefix+"0", prefixCodeTable)
+		header = BuildTreeFromHeader(header, currentPrefix+"1", prefixCodeTable)
+		return header
+	} else {
+		// Get the char from the header
+		char := rune(header[1])
+		// remove 1 and the character from the array
+		header = header[2:]
+		prefixCodeTable[currentPrefix] = char
+		return header
+	}
 }
