@@ -52,14 +52,26 @@ func encode(file []byte) []byte {
 	for _, c := range string(file) {
 		fullBitString += prefixCodeTable[c]
 	}
-	fmt.Println(fullBitString)
 	l := len(fullBitString)
 	for i := 0; i < l; i += 7 {
 		end := min(l, i+7)
 		bitString := fullBitString[i:end]
 		byteString := bitStringToByte(bitString)
-		fmt.Printf("Transforming %s to byte %d (%s)\n", bitString, byteString, string(byteString))
 		encodedFile = append(encodedFile, byteString)
+		if end == l {
+			zeroPos, zeroCount := 0, 0
+			for zeroPos < len(bitString) && bitString[zeroPos] == '0' {
+				zeroCount += 1
+				zeroPos += 1
+			}
+			if zeroCount == len(bitString) {
+				// If all bits are zero, we dont' want to count
+				// one of them
+				zeroCount -= 1
+			}
+			lastByteInfo := byte(zeroCount)
+			encodedFile = append(encodedFile, lastByteInfo)
+		}
 	}
 	return encodedFile
 }
@@ -74,20 +86,27 @@ func decode(file []byte) []byte {
 	}
 	header := string(file[0:headerEndPos])
 	encodedText := file[headerEndPos+1:]
-	fmt.Println(string(encodedText))
 	bitStringRune := make(map[string]rune)
 	remainingHeader := BuildTreeFromHeader(header, "", bitStringRune)
 	if remainingHeader != "" {
 		log.Fatalln("Can't continue because header was not completly processed, remaining:", remainingHeader)
 	}
 	fullBitString := ""
-	for i, b := range encodedText {
+	for i, b := range encodedText[:len(encodedText)-1] {
 		bitString := strconv.FormatInt(int64(b), 2)
 		// Pad left with zeroes
-		if i < len(encodedText)-1 {
+		if i < len(encodedText)-2 {
 			bitString = fmt.Sprintf("%07s", bitString)
+		} else {
+			// The last byte of the encoded file contains how many zeroes should we
+			// use to pad the last byte of the original text, because we can't default
+			// to a bitstring on length 7
+			lastByteInfo := encodedText[len(encodedText)-1]
+			numberOfPaddingZeroesAtEnd := int(lastByteInfo)
+			if numberOfPaddingZeroesAtEnd > 0 {
+				bitString = fmt.Sprintf("%0*s", numberOfPaddingZeroesAtEnd+len(bitString), bitString)
+			}
 		}
-		fmt.Printf("Got byte: %d which is %s and equivalent to %s\n", b, string(b), bitString)
 		fullBitString += bitString
 	}
 	decodedText := []byte{}
@@ -120,7 +139,7 @@ func main() {
 
 	file, err := os.ReadFile(filename)
 	if err != nil {
-		log.Fatalln("Erro reading input file", err)
+		log.Fatalln("Error reading input file", err)
 	}
 
 	var result []byte
@@ -128,7 +147,6 @@ func main() {
 		result = encode(file)
 	} else {
 		result = decode(file)
-		fmt.Println(result)
 	}
 
 	if outputFile != "" {

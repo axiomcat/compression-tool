@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -37,13 +37,34 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func TestEncoder(t *testing.T) {
+func TestEncoderRandom(t *testing.T) {
 	s := RandStringRunes(rand.Intn(10000))
-	fmt.Println(s)
 	file := []byte(s)
 	encodedFile := encode(file)
 	decodedFile := decode(encodedFile)
 	if !reflect.DeepEqual(file, decodedFile) {
 		t.Errorf("File and decoded file are not the same: Expected %s but got %s", string(file), string(decodedFile))
+	}
+}
+
+var FileTest = []struct {
+	filename string
+}{
+	{"test1.in"},
+	{"test2.in"},
+	{"test3.in"},
+}
+
+func TestEncoderFiles(t *testing.T) {
+	for _, testData := range FileTest {
+		file, err := os.ReadFile(testData.filename)
+		if err != nil {
+			t.Error("Error reading input file", err)
+		}
+		encodedFile := encode(file)
+		decodedFile := decode(encodedFile)
+		if !reflect.DeepEqual(file, decodedFile) {
+			t.Errorf("File and decoded file are not the same: Expected %s but got %s", string(file), string(decodedFile))
+		}
 	}
 }
