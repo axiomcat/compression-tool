@@ -48,31 +48,35 @@ func encode(file []byte) []byte {
 	encodedFile := []byte(headerString)
 	encodedFile = append(encodedFile, HEADER_END)
 
-	fullBitString := ""
+	currentPrefix := ""
 	for _, c := range string(file) {
-		fullBitString += prefixCodeTable[c]
-	}
-	l := len(fullBitString)
-	for i := 0; i < l; i += 7 {
-		end := min(l, i+7)
-		bitString := fullBitString[i:end]
-		byteString := bitStringToByte(bitString)
-		encodedFile = append(encodedFile, byteString)
-		if end == l {
-			zeroPos, zeroCount := 0, 0
-			for zeroPos < len(bitString) && bitString[zeroPos] == '0' {
-				zeroCount += 1
-				zeroPos += 1
-			}
-			if zeroCount == len(bitString) {
-				// If all bits are zero, we dont' want to count
-				// one of them
-				zeroCount -= 1
-			}
-			lastByteInfo := byte(zeroCount)
-			encodedFile = append(encodedFile, lastByteInfo)
+		prefixStr := prefixCodeTable[c]
+		currentPrefix += prefixStr
+		if len(currentPrefix) > 7 {
+			bitString := currentPrefix[:7]
+			byteString := bitStringToByte(bitString)
+			encodedFile = append(encodedFile, byteString)
+			currentPrefix = currentPrefix[7:]
 		}
 	}
+	// We alway have text remaining in currentPrefix
+	bitString := currentPrefix
+	byteString := bitStringToByte(bitString)
+	encodedFile = append(encodedFile, byteString)
+
+	// Count number of padding zeroes to add it to the last byte
+	zeroPos, zeroCount := 0, 0
+	for zeroPos < len(bitString) && bitString[zeroPos] == '0' {
+		zeroCount += 1
+		zeroPos += 1
+	}
+	// If all bits are zero, we dont' want to count one of them
+	if zeroCount == len(bitString) {
+		zeroCount -= 1
+	}
+	lastByteInfo := byte(zeroCount)
+	encodedFile = append(encodedFile, lastByteInfo)
+
 	return encodedFile
 }
 
@@ -145,6 +149,8 @@ func main() {
 	var result []byte
 	if process == "encode" {
 		result = encode(file)
+		reducedSize := 100 - (100 * float32(len(result)) / float32(len(file)))
+		fmt.Printf("Filesize from %d to %d bytes. A reduction of %.2f\n", len(file), len(result), reducedSize)
 	} else {
 		result = decode(file)
 	}
