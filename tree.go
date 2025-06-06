@@ -2,8 +2,8 @@ package main
 
 import (
 	"container/heap"
-	"fmt"
 	"slices"
+	"unicode/utf8"
 )
 
 type Node struct {
@@ -11,6 +11,7 @@ type Node struct {
 	Char      rune
 	LeftNode  *Node
 	RightNode *Node
+	IsLeaf    bool
 }
 
 func compareNodes(nodeA Node, nodeB Node) int {
@@ -18,65 +19,33 @@ func compareNodes(nodeA Node, nodeB Node) int {
 
 }
 
-func printNodes(nodes []Node) {
-	for _, n := range nodes {
-		if n.Char == 10 {
-			continue
-		}
-		fmt.Printf("%s:%d|", string(n.Char), n.Weight)
-	}
-	fmt.Println()
-}
-
-func printTree(node *Node) {
-	if node == nil {
-		return
-	}
-	printTree(node.LeftNode)
-	fmt.Printf("%d:%s\n", node.Weight, string(node.Char))
-	printTree(node.RightNode)
-}
-
 func BuildHuffmanTree(nodes []Node) Node {
 	slices.SortFunc(nodes, compareNodes)
-	usePQ := true
-	if usePQ {
-		pq := make(PriorityQueue, len(nodes))
-		i := 0
+	pq := make(PriorityQueue, len(nodes))
+	i := 0
 
-		for _, n := range nodes {
-			pq[i] = &Item{
-				value:    n,
-				priority: -n.Weight,
-				index:    i,
-			}
-			i++
+	for _, n := range nodes {
+		pq[i] = &Item{
+			value:    n,
+			priority: -n.Weight,
+			index:    i,
 		}
-		heap.Init(&pq)
-		for pq.Len() > 1 {
-			tempL := heap.Pop(&pq).(*Item)
-			tempR := heap.Pop(&pq).(*Item)
-			newRoot := Node{Weight: tempL.value.Weight + tempR.value.Weight, LeftNode: &tempL.value, RightNode: &tempR.value}
-			newItem := &Item{
-				value:    newRoot,
-				priority: 1,
-			}
-			heap.Push(&pq, newItem)
-			pq.Update(newItem, newItem.value, -newItem.value.Weight)
+		i++
+	}
+	heap.Init(&pq)
+	for pq.Len() > 1 {
+		tempL := heap.Pop(&pq).(*Item)
+		tempR := heap.Pop(&pq).(*Item)
+		newRoot := Node{Weight: tempL.value.Weight + tempR.value.Weight, LeftNode: &tempL.value, RightNode: &tempR.value, IsLeaf: false}
+		newItem := &Item{
+			value:    newRoot,
+			priority: 1,
 		}
-		treeRoot := heap.Pop(&pq).(*Item)
-		return treeRoot.value
+		heap.Push(&pq, newItem)
+		pq.Update(newItem, newItem.value, -newItem.value.Weight)
 	}
-
-	for len(nodes) > 1 {
-		tempL := nodes[0]
-		tempR := nodes[1]
-		newRoot := Node{Weight: tempL.Weight + tempR.Weight, LeftNode: &tempL, RightNode: &tempR}
-		nodes = slices.Delete(nodes, 0, 2)
-		nodes = append(nodes, newRoot)
-		slices.SortFunc(nodes, compareNodes)
-	}
-	return nodes[0]
+	treeRoot := heap.Pop(&pq).(*Item)
+	return treeRoot.value
 }
 
 func BuildPrefixCodeTable(tree Node) map[rune]string {
@@ -87,7 +56,7 @@ func BuildPrefixCodeTable(tree Node) map[rune]string {
 
 func buildPrefixCodeTableAux(tree *Node, table map[rune]string, currPrefix string) {
 	// Is a leaf
-	if tree.Char != 0 {
+	if tree.IsLeaf {
 		table[tree.Char] = currPrefix
 		return
 	}
@@ -102,13 +71,12 @@ func BuildHeaderTree(tree *Node, path string) string {
 	if tree == nil {
 		return ""
 	}
-	l := BuildHeaderTree(tree.LeftNode, path)
-	r := BuildHeaderTree(tree.RightNode, path)
+	l := BuildHeaderTree(tree.LeftNode, path+"0")
+	r := BuildHeaderTree(tree.RightNode, path+"1")
 	return "0" + l + r
 }
 
 func BuildTreeFromHeader(header string, currentPrefix string, prefixCodeTable map[string]rune) string {
-	// Header 01E001U1D01L01C001Z1K1M
 	headerValue := header[0]
 	if headerValue == '0' {
 		// Remove 0 from the header
@@ -118,9 +86,9 @@ func BuildTreeFromHeader(header string, currentPrefix string, prefixCodeTable ma
 		return header
 	} else {
 		// Get the char from the header
-		char := rune(header[1])
+		char, w := utf8.DecodeRuneInString(header[1:])
 		// remove 1 and the character from the array
-		header = header[2:]
+		header = header[1+w:]
 		prefixCodeTable[currentPrefix] = char
 		return header
 	}

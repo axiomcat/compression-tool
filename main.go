@@ -6,19 +6,24 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"unicode/utf8"
 )
 
-const HEADER_END = '#'
+const HEADER_END = 'ӧ'
 
 func BuildCharFrequency(file string) map[rune]int {
 	charFrequency := make(map[rune]int)
-	for _, c := range file {
-		if _, ok := charFrequency[c]; ok {
-			charFrequency[c] += 1
+	for i := 0; i < len(file); {
+		r, w := utf8.DecodeRuneInString(file[i:])
+		if _, ok := charFrequency[r]; ok {
+			charFrequency[r] += 1
 		} else {
-			charFrequency[c] = 1
+			charFrequency[r] = 1
 		}
+
+		i += w
 	}
+
 	return charFrequency
 }
 
@@ -36,7 +41,7 @@ func encode(file []byte) []byte {
 
 	nodes := []Node{}
 	for k, v := range charFrequency {
-		newNode := Node{Weight: v, Char: k, LeftNode: nil, RightNode: nil}
+		newNode := Node{Weight: v, Char: k, LeftNode: nil, RightNode: nil, IsLeaf: true}
 		nodes = append(nodes, newNode)
 	}
 
@@ -46,23 +51,29 @@ func encode(file []byte) []byte {
 	// Build header
 	headerString := BuildHeaderTree(&tree, "")
 	encodedFile := []byte(headerString)
-	encodedFile = append(encodedFile, HEADER_END)
+	encodedFile = utf8.AppendRune(encodedFile, HEADER_END)
 
 	currentPrefix := ""
 	for _, c := range string(file) {
 		prefixStr := prefixCodeTable[c]
 		currentPrefix += prefixStr
-		if len(currentPrefix) > 7 {
+		for len(currentPrefix) > 7 {
 			bitString := currentPrefix[:7]
 			byteString := bitStringToByte(bitString)
 			encodedFile = append(encodedFile, byteString)
 			currentPrefix = currentPrefix[7:]
 		}
 	}
-	// We alway have text remaining in currentPrefix
 	bitString := currentPrefix
-	byteString := bitStringToByte(bitString)
-	encodedFile = append(encodedFile, byteString)
+
+	// We alway have text remaining in currentPrefix
+	for len(currentPrefix) > 0 {
+		limit := min(len(currentPrefix), 7)
+		bitString = currentPrefix[:limit]
+		byteString := bitStringToByte(bitString)
+		encodedFile = append(encodedFile, byteString)
+		currentPrefix = currentPrefix[limit:]
+	}
 
 	// Count number of padding zeroes to add it to the last byte
 	zeroPos, zeroCount := 0, 0
@@ -82,21 +93,29 @@ func encode(file []byte) []byte {
 
 func decode(file []byte) []byte {
 	headerEndPos := 0
-	for i, c := range file {
+	for i := 0; i < len(file); {
+		c, w := utf8.DecodeRune(file[i:])
 		if c == HEADER_END {
 			headerEndPos = i
 			break
 		}
+		i += w
 	}
 	header := string(file[0:headerEndPos])
 	encodedText := file[headerEndPos+1:]
 	bitStringRune := make(map[string]rune)
 	remainingHeader := BuildTreeFromHeader(header, "", bitStringRune)
 	if remainingHeader != "" {
+		log.Println(header)
 		log.Fatalln("Can't continue because header was not completly processed, remaining:", remainingHeader)
 	}
-	fullBitString := ""
+	currentBitString := ""
+
+	decodedText := []byte{}
 	for i, b := range encodedText[:len(encodedText)-1] {
+		if i > 100 {
+			break
+		}
 		bitString := strconv.FormatInt(int64(b), 2)
 		// Pad left with zeroes
 		if i < len(encodedText)-2 {
@@ -111,20 +130,23 @@ func decode(file []byte) []byte {
 				bitString = fmt.Sprintf("%0*s", numberOfPaddingZeroesAtEnd+len(bitString), bitString)
 			}
 		}
-		fullBitString += bitString
-	}
-	decodedText := []byte{}
-	l, r := 0, 0
-	for l < len(fullBitString) && r < len(fullBitString) {
-		currBitString := fullBitString[l : r+1]
-		if runeValue, ok := bitStringRune[currBitString]; ok {
-			decodedText = append(decodedText, byte(runeValue))
-			l = r + 1
-			r = l
-		} else {
-			r += 1
+		currentBitString += bitString
+
+		l, r := 0, 0
+		for l < len(currentBitString) && r < len(currentBitString) {
+			bitStringToDecode := currentBitString[l : r+1]
+			if runeValue, ok := bitStringRune[bitStringToDecode]; ok {
+				decodedText = utf8.AppendRune(decodedText, runeValue)
+				l = r + 1
+				r = l
+			} else {
+				r += 1
+			}
 		}
+		currentBitString = currentBitString[l:]
 	}
+	fmt.Println("Finished building bit string")
+	fmt.Println("Finished decoding")
 	return decodedText
 }
 
@@ -150,7 +172,7 @@ func main() {
 	if process == "encode" {
 		result = encode(file)
 		reducedSize := 100 - (100 * float32(len(result)) / float32(len(file)))
-		fmt.Printf("Filesize from %d to %d bytes. A reduction of %.2f\n", len(file), len(result), reducedSize)
+		fmt.Printf("Filesize from %d to %d bytes. A reduction of %.2f%%\n", len(file), len(result), reducedSize)
 	} else {
 		result = decode(file)
 	}
