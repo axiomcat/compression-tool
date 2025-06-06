@@ -50,9 +50,10 @@ func TestEncoderRandom(t *testing.T) {
 var FileTest = []struct {
 	filename string
 }{
-	{"test1.in"},
-	{"test2.in"},
-	{"test3.in"},
+	{"tests/test1.in"},
+	{"tests/test2.in"},
+	{"tests/test3.in"},
+	{"tests/book.txt"},
 }
 
 func TestEncoderFiles(t *testing.T) {

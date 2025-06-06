@@ -54,7 +54,8 @@ func encode(file []byte) []byte {
 	encodedFile = utf8.AppendRune(encodedFile, HEADER_END)
 
 	currentPrefix := ""
-	for _, c := range string(file) {
+	for i := 0; i < len(file); {
+		c, w := utf8.DecodeRune(file[i:])
 		prefixStr := prefixCodeTable[c]
 		currentPrefix += prefixStr
 		for len(currentPrefix) > 7 {
@@ -63,6 +64,7 @@ func encode(file []byte) []byte {
 			encodedFile = append(encodedFile, byteString)
 			currentPrefix = currentPrefix[7:]
 		}
+		i += w
 	}
 	bitString := currentPrefix
 
@@ -92,17 +94,18 @@ func encode(file []byte) []byte {
 }
 
 func decode(file []byte) []byte {
-	headerEndPos := 0
+	headerStart, headerEnd := 0, 0
 	for i := 0; i < len(file); {
 		c, w := utf8.DecodeRune(file[i:])
 		if c == HEADER_END {
-			headerEndPos = i
+			headerStart = i
+			headerEnd = i + w
 			break
 		}
 		i += w
 	}
-	header := string(file[0:headerEndPos])
-	encodedText := file[headerEndPos+1:]
+	header := string(file[0:headerStart])
+	encodedText := file[headerEnd:]
 	bitStringRune := make(map[string]rune)
 	remainingHeader := BuildTreeFromHeader(header, "", bitStringRune)
 	if remainingHeader != "" {
@@ -113,9 +116,6 @@ func decode(file []byte) []byte {
 
 	decodedText := []byte{}
 	for i, b := range encodedText[:len(encodedText)-1] {
-		if i > 100 {
-			break
-		}
 		bitString := strconv.FormatInt(int64(b), 2)
 		// Pad left with zeroes
 		if i < len(encodedText)-2 {
@@ -145,8 +145,6 @@ func decode(file []byte) []byte {
 		}
 		currentBitString = currentBitString[l:]
 	}
-	fmt.Println("Finished building bit string")
-	fmt.Println("Finished decoding")
 	return decodedText
 }
 
